@@ -129,49 +129,54 @@ with tab3:
         )
 
 # ---------- BALANCES ----------
+# ---------- BALANCES ----------
 with tab4:
     st.markdown('<div class="sub-title">📊 Balances & Settlements</div>', unsafe_allow_html=True)
-    bal_df = utils.compute_balances(supabase)
-    if bal_df.empty:
-        st.info('ℹ️ No balances yet.')
+    
+    # Fetch history & members
+    hist_df = utils.fetch_history(supabase)  # Should have columns: title, payer, participants, amount, etc.
+    members_df = utils.fetch_members(supabase)
+    members = members_df['name'].tolist()
+
+    if hist_df.empty:
+        st.info('ℹ️ No expenses yet.')
     else:
-        # 1️⃣ Show balance table
-        st.markdown("### Current Balances")
-        bal_table = bal_df.copy()
-        bal_table['Balance (₹)'] = bal_table['balance'].apply(lambda x: f"₹{x:.2f}")
-        st.dataframe(bal_table[['name', 'Balance (₹)']], use_container_width=True)
+        # Create pivot-like table for each event
+        event_balances = []
+        for _, row in hist_df.iterrows():
+            # Initialize dictionary with 0 for each member
+            balances = {m: 0.0 for m in members}
+            
+            payer = row['payer']
+            amount = row['amount']
+            participants = row['participants'].split(",") if 'participants' in row and row['participants'] else members
 
-        # 2️⃣ Show as metric cards
-        cols = st.columns(len(bal_df))
-        for idx, row in bal_df.iterrows():
-            color = "green" if row.balance > 0 else "red" if row.balance < 0 else "gray"
-            with cols[idx]:
-                st.markdown(
-                    f"<div class='metric-card'><b>{row.name}</b><br><span style='color:{color}'>₹{row.balance:.2f}</span></div>",
-                    unsafe_allow_html=True
-                )
+            # Per-person share
+            share = round(amount / len(participants), 2)
+            
+            # Deduct share for each participant
+            for p in participants:
+                balances[p] -= share
 
-        # 3️⃣ Settlement suggestion table
-        if st.button('💡 Suggest Minimal Transfers'):
-            pos = bal_df[bal_df.balance > 0][['name','balance']].to_dict('records')
-            neg = bal_df[bal_df.balance < 0][['name','balance']].to_dict('records')
-            pos = sorted(pos, key=lambda x: x['balance'], reverse=True)
-            neg = sorted(neg, key=lambda x: x['balance'])
-            i, j = 0, 0
-            transfers = []
-            while i < len(pos) and j < len(neg):
-                p = pos[i]; n = neg[j]
-                amt = min(p['balance'], -n['balance'])
-                transfers.append({
-                    'From': n['name'],
-                    'To': p['name'],
-                    'Amount (₹)': round(amt, 2)
-                })
-                p['balance'] -= amt
-                n['balance'] += amt
-                if abs(p['balance']) < 1e-9: i += 1
-                if abs(n['balance']) < 1e-9: j += 1
+            # Add total amount to payer
+            balances[payer] += amount
 
-            st.markdown("### 💱 Suggested Settlements")
-            transfers_df = pd.DataFrame(transfers)
-            st.dataframe(transfers_df, use_container_width=True)
+            balances['Event'] = row['title']
+            event_balances.append(balances)
+
+        # Convert to DataFrame
+        event_df = pd.DataFrame(event_balances)
+        cols_order = ['Event'] + members
+        event_df = event_df[cols_order]
+
+        # Format as ₹
+        for m in members:
+            event_df[m] = event_df[m].apply(lambda x: f"₹{x:.2f}")
+
+        st.markdown("### 🧾 Event-wise Balances")
+        st.dataframe(event_df, use_container_width=True)
+
+        # Overall balances
+        st.markdown("### 📊 Total Balances")
+        bal_df = utils.compute_balances(supabase)
+        st.dataframe(bal_df, use_container_width=True)
