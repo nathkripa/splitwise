@@ -32,7 +32,7 @@ else:
 
 # ---------- GUEST MODE HELPERS ----------
 def guest_fetch_members():
-    return pd.DataFrame(st.session_state.get("guest_members", []))
+    return pd.DataFrame(st.session_state.get("guest_members", []), columns=["id", "name"])
 
 def guest_create_member(name):
     if "guest_members" not in st.session_state:
@@ -60,7 +60,7 @@ def guest_create_expense(payer_id, amount, title, description, participant_ids):
     guest_update_balances(payer_id, amount, participant_ids)
 
 def guest_compute_balances():
-    return pd.DataFrame(st.session_state.get("guest_balances", []))
+    return pd.DataFrame(st.session_state.get("guest_balances", []), columns=["id", "name", "balance"])
 
 def guest_update_balances(payer_id, amount, participants):
     if "guest_balances" not in st.session_state:
@@ -69,12 +69,12 @@ def guest_update_balances(payer_id, amount, participants):
     member_ids = {m["id"]: m["name"] for m in st.session_state.guest_members}
     balances = {b["id"]: b["balance"] for b in st.session_state.guest_balances}
     for mid in member_ids:
-        balances.setdefault(mid, float(0.0))
+        balances.setdefault(mid, 0.0)
 
     share = float(amount) / len(participants)
     for pid in participants:
         balances[pid] -= share
-    balances[payer_id] += float(amount) - share
+    balances[payer_id] += amount - share
 
     st.session_state.guest_balances = [{"id": mid, "name": member_ids[mid], "balance": bal} for mid, bal in balances.items()]
 
@@ -121,10 +121,6 @@ st.caption(f"Mode: **{st.session_state.mode}** — {'Connected to Supabase' if i
 
 # ---------- SIDEBAR ----------
 with st.sidebar:
-    st.header("⚙️ Quick Actions")
-    if st.button("🔄 Refresh Data"):
-        st.experimental_rerun()
-    st.markdown("---")
     st.info("Thanks for Visiting.")
 
 # ---------- MAIN TABS ----------
