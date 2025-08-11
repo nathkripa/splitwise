@@ -60,9 +60,7 @@ with st.sidebar:
     if st.button("🔄 Refresh Data"):
         st.experimental_rerun()
     st.markdown("---")
-    st.write("**Supabase URL:**")
-    st.code(SUPABASE_URL)
-    st.info("For production, enable RLS and use Supabase Auth.")
+    st.info("Thanks for Visiting.")
 
 # ---------- MAIN TABS ----------
 tab1, tab2, tab3, tab4 = st.tabs(["👥 Members", "➕ Add Expense", "📜 History", "📊 Balances"])
