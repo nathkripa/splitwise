@@ -18,9 +18,29 @@ st.session_state.mode = st.sidebar.radio(
 )
 
 is_login_mode = st.session_state.mode == "Login Mode"
+# --- Login state ---
+if "logged_in" not in st.session_state:
+    st.session_state.logged_in = False
 
+# --- Login form for Login Mode ---
+def login_form():
+    st.sidebar.markdown("### 🔐 Login Required")
+    user_id = st.sidebar.text_input("User ID")
+    password = st.sidebar.text_input("Password", type="password")
+    if st.sidebar.button("Login"):
+        # TODO: Replace below with your real auth check
+        if user_id == st.secrets['app_username'] and password == st.secrets['app_password']:
+            st.session_state.logged_in = True
+            st.experimental_rerun()
+        else:
+            st.sidebar.error("❌ Invalid credentials")
+
+if is_login_mode and not st.session_state.logged_in:
+    login_form()
+    st.warning("Please log in to access the app.")
+    st.stop()
 # ---------- INIT SUPABASE ----------
-if is_login_mode:
+if is_login_mode and st.session_state.logged_in:
     SUPABASE_URL = st.secrets['url']
     SUPABASE_ANON_KEY = st.secrets['key']
     if not SUPABASE_URL or not SUPABASE_ANON_KEY:
