@@ -31,7 +31,7 @@ def login_form():
         # TODO: Replace below with your real auth check
         if user_id == st.secrets['app_username'] and password == st.secrets['app_password']:
             st.session_state.logged_in = True
-            st.experimental_rerun()
+            st.rerun()
         else:
             st.sidebar.error("❌ Invalid credentials")
 
