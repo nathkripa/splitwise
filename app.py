@@ -30,7 +30,7 @@ def login_form():
         # Replace with your real auth check
         if user_id == st.secrets['app_username'] and password == st.secrets['app_password']:
             st.session_state.logged_in = True
-            st.experimental_rerun()
+            st.rerun()
         else:
             st.sidebar.error("❌ Invalid credentials")
 
@@ -71,7 +71,7 @@ if is_login_mode and st.session_state.logged_in:
                 supabase.table("members").delete().neq('id', 0).execute()
                 st.success("✅ Database flushed successfully.")
                 st.session_state.show_flush_confirm = False
-                st.experimental_rerun()
+                st.rerun()
             except Exception as e:
                 st.error(f"❌ Error flushing DB: {e}")
         if col2.button("Cancel"):
@@ -152,7 +152,7 @@ with tab3:
                         supabase.table("transactions").delete().eq('expense_id', expense_id).execute()
                         supabase.table("expenses").delete().eq('id', expense_id).execute()
                         st.success(f"Deleted expense '{title}' and related transactions.")
-                        st.experimental_rerun()
+                        st.rerun()
                     except Exception as e:
                         st.error(f"Failed to delete: {e}")
                 else:
@@ -163,7 +163,7 @@ with tab3:
                         e for e in st.session_state.guest_expenses if e['id'] != expense_id
                     ]
                     st.success(f"Deleted expense '{title}' and related transactions (guest mode).")
-                    st.experimental_rerun()
+                    st.rerun()
 
 # --- BALANCES with PAID toggle buttons ---
 with tab4:
@@ -214,7 +214,7 @@ with tab4:
                             st.session_state.paid_settlements.remove(key)
                         else:
                             st.session_state.paid_settlements.add(key)
-                        st.experimental_rerun()
+                        st.rerun()
                 with col2:
                     style = "text-decoration: line-through; color: gray;" if paid else ""
                     st.markdown(
