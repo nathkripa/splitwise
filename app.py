@@ -148,7 +148,7 @@ with tab4:
             balances = {m: 0.0 for m in members}
             
             payer = row['payer']
-            amount = row['amount']
+            amount = row['share']
             participants = row['participants'].split(",") if 'participants' in row and row['participants'] else members
 
             # Per-person share
