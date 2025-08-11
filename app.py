@@ -42,8 +42,8 @@ st.markdown("""
 
 # ---------- INIT SUPABASE ----------
 # Initialize Supabase client from Streamlit secrets
-SUPABASE_URL = st.secrets[url]
-SUPABASE_ANON_KEY = st.secrets[key]
+SUPABASE_URL = st.secrets['url']
+SUPABASE_ANON_KEY = st.secrets['key']
 if not SUPABASE_URL or not SUPABASE_ANON_KEY:
     st.error('Please add SUPABASE_URL and SUPABASE_ANON_KEY to Streamlit secrets (or .streamlit/secrets.toml for local testing).')
     st.stop()
