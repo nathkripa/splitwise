@@ -4,7 +4,7 @@ from decimal import Decimal
 from typing import List, Dict
 
 def fetch_members(supabase: Client) -> pd.DataFrame:
-    resp = supabase.table('members').select('*').order('name', {'ascending': True}).execute()
+    resp = supabase.table('members').select('*').execute()
     data = resp.data or []
     return pd.DataFrame(data)
 
@@ -21,7 +21,6 @@ def create_member(supabase: Client, name: str):
 def create_expense_with_transactions(supabase: Client, payer_id: int, amount: Decimal, title: str, description: str, participant_ids: List[int]):
     # Insert expense
     resp = supabase.table('expenses').insert({
-        'title': title,
         'payer_id': payer_id,
         'amount': float(amount),
         'description': description
@@ -44,7 +43,7 @@ def create_expense_with_transactions(supabase: Client, payer_id: int, amount: De
     return expense_id
 
 def fetch_history(supabase: Client):
-    expenses = supabase.table('expenses').select('*').order('created_at', {'ascending': False}).execute().data or []
+    expenses = supabase.table('expenses').select('*').execute().data or []
     transactions = supabase.table('transactions').select('*').execute().data or []
     members = {m['id']: m['name'] for m in (supabase.table('members').select('*').execute().data or [])}
     rows = []
@@ -85,4 +84,4 @@ def compute_balances(supabase: Client):
     for mid, bal in balances.items():
         rows.append({'member_id': mid, 'name': id2name.get(mid,'n/a'), 'balance': round(bal,2)})
     import pandas as pd
-    return pd.DataFrame(rows).sort_values(by='balance', ascending=False).reset_index(drop=True)
+    return pd.DataFrame(rows).reset_index(drop=True)
