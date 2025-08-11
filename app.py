@@ -160,7 +160,7 @@ def login_page():
     password = st.text_input("Password", type="password")
     
     if st.button("Login", type="primary"):
-        if username == st.secrets.get("app_username") and password == st.secrets.get("app_password"):
+        if username == st.secrets['app_username'] and password == st.secrets['app_password']:
             st.session_state.authenticated = True
             st.rerun()
         else:
