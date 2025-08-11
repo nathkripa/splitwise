@@ -62,9 +62,9 @@ if is_login_mode and st.session_state.logged_in:
         col1, col2 = st.columns(2)
         if col1.button("Yes, Delete Everything"):
             try:
-                supabase.table("transactions").delete().execute()
-                supabase.table("expenses").delete().execute()
-                supabase.table("members").delete().execute()
+                supabase.table("transactions").delete().neq('id', -1).execute()
+                supabase.table("expenses").delete().neq('id',-1).execute()
+                supabase.table("members").delete().neq('id', -1).execute()
                 st.success("✅ Database flushed successfully.")
                 st.session_state.show_flush_confirm = False
                 st.experimental_rerun()
