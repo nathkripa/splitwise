@@ -7,52 +7,117 @@ import utils
 # ---------- CONFIG ----------
 st.set_page_config(page_title='🏢 Splitwise — Office Edition', page_icon='💸', layout='wide')
 
+# ---------- MODE SELECTION ----------
+if "mode" not in st.session_state:
+    st.session_state.mode = "Guest"
+
+st.session_state.mode = st.sidebar.radio(
+    "Select Mode",
+    options=["Login Mode", "Guest Mode"],
+    index=0 if st.session_state.mode == "Login Mode" else 1
+)
+
+is_login_mode = st.session_state.mode == "Login Mode"
+
+# ---------- INIT SUPABASE ----------
+if is_login_mode:
+    SUPABASE_URL = st.secrets['url']
+    SUPABASE_ANON_KEY = st.secrets['key']
+    if not SUPABASE_URL or not SUPABASE_ANON_KEY:
+        st.error('Please add SUPABASE_URL and SUPABASE_ANON_KEY to Streamlit secrets.')
+        st.stop()
+    supabase: Client = create_client(SUPABASE_URL, SUPABASE_ANON_KEY)
+else:
+    supabase = None
+
+# ---------- GUEST MODE HELPERS ----------
+def guest_fetch_members():
+    return pd.DataFrame(st.session_state.get("guest_members", []))
+
+def guest_create_member(name):
+    if "guest_members" not in st.session_state:
+        st.session_state.guest_members = []
+    new_id = len(st.session_state.guest_members) + 1
+    new_member = {"id": new_id, "name": name}
+    st.session_state.guest_members.append(new_member)
+    return new_member
+
+def guest_fetch_history():
+    return pd.DataFrame(st.session_state.get("guest_history", []))
+
+def guest_create_expense(payer_id, amount, title, description, participant_ids):
+    if "guest_history" not in st.session_state:
+        st.session_state.guest_history = []
+    exp_id = len(st.session_state.guest_history) + 1
+    st.session_state.guest_history.append({
+        "id": exp_id,
+        "payer_id": payer_id,
+        "amount": float(amount),
+        "title": title,
+        "description": description,
+        "participants": participant_ids
+    })
+    guest_update_balances(payer_id, amount, participant_ids)
+
+def guest_compute_balances():
+    return pd.DataFrame(st.session_state.get("guest_balances", []))
+
+def guest_update_balances(payer_id, amount, participants):
+    if "guest_balances" not in st.session_state:
+        st.session_state.guest_balances = []
+    # Ensure all participants are in balances
+    member_ids = {m["id"]: m["name"] for m in st.session_state.guest_members}
+    balances = {b["id"]: b["balance"] for b in st.session_state.guest_balances}
+    for mid in member_ids:
+        balances.setdefault(mid, 0.0)
+
+    share = float(amount) / len(participants)
+    for pid in participants:
+        balances[pid] -= share
+    balances[payer_id] += amount - share
+
+    st.session_state.guest_balances = [{"id": mid, "name": member_ids[mid], "balance": bal} for mid, bal in balances.items()]
+
+# ---------- ABSTRACTED FUNCTIONS ----------
+def fetch_members():
+    return utils.fetch_members(supabase) if is_login_mode else guest_fetch_members()
+
+def create_member(name):
+    return utils.create_member(supabase, name) if is_login_mode else guest_create_member(name)
+
+def fetch_history():
+    return utils.fetch_history(supabase) if is_login_mode else guest_fetch_history()
+
+def create_expense_with_transactions(payer_id, amount, title, description, participant_ids):
+    if is_login_mode:
+        return utils.create_expense_with_transactions(
+            supabase,
+            payer_id=payer_id,
+            amount=Decimal(str(amount)),
+            title=title,
+            description=description,
+            participant_ids=participant_ids
+        )
+    else:
+        return guest_create_expense(payer_id, amount, title, description, participant_ids)
+
+def compute_balances():
+    return utils.compute_balances(supabase) if is_login_mode else guest_compute_balances()
+
 # ---------- STYLE ----------
 st.markdown("""
     <style>
-        .main-title {
-            font-size: 2.2rem;
-            font-weight: bold;
-            color: #4CAF50;
-        }
-        .sub-title {
-            font-size: 1.4rem;
-            margin-top: 20px;
-            color: #333;
-        }
-        .stButton>button {
-            background-color: #4CAF50;
-            color: white;
-            border-radius: 8px;
-            padding: 8px 20px;
-            font-size: 15px;
-        }
-        .dataframe {
-            border-radius: 8px;
-        }
-        .metric-card {
-            background-color: #f8f9fa;
-            border-radius: 12px;
-            padding: 15px;
-            text-align: center;
-            box-shadow: 0 2px 6px rgba(0,0,0,0.05);
-        }
+        .main-title { font-size: 2.2rem; font-weight: bold; color: #4CAF50; }
+        .sub-title { font-size: 1.4rem; margin-top: 20px; color: #333; }
+        .stButton>button { background-color: #4CAF50; color: white; border-radius: 8px; padding: 8px 20px; font-size: 15px; }
+        .dataframe { border-radius: 8px; }
+        .metric-card { background-color: #f8f9fa; border-radius: 12px; padding: 15px; text-align: center; box-shadow: 0 2px 6px rgba(0,0,0,0.05); }
     </style>
 """, unsafe_allow_html=True)
 
-# ---------- INIT SUPABASE ----------
-# Initialize Supabase client from Streamlit secrets
-SUPABASE_URL = st.secrets['url']
-SUPABASE_ANON_KEY = st.secrets['key']
-if not SUPABASE_URL or not SUPABASE_ANON_KEY:
-    st.error('Please add SUPABASE_URL and SUPABASE_ANON_KEY to Streamlit secrets (or .streamlit/secrets.toml for local testing).')
-    st.stop()
-
-supabase: Client = create_client(SUPABASE_URL, SUPABASE_ANON_KEY)
-
 # ---------- HEADER ----------
 st.markdown('<div class="main-title">💸 Splitwise — Office Edition</div>', unsafe_allow_html=True)
-st.caption("Easily manage and split expenses for your team. Powered by Streamlit + Supabase.")
+st.caption(f"Mode: **{st.session_state.mode}** — {'Connected to Supabase' if is_login_mode else 'Session Only'}")
 
 # ---------- SIDEBAR ----------
 with st.sidebar:
@@ -75,16 +140,15 @@ with tab1:
             if not name.strip():
                 st.error('⚠️ Name required')
             else:
-                u = utils.create_member(supabase, name.strip())
+                u = create_member(name.strip())
                 if u:
                     st.success(f"✅ Added {u['name']}")
-    members_df = utils.fetch_members(supabase)
-    st.dataframe(members_df, use_container_width=True)
+    st.dataframe(fetch_members(), use_container_width=True)
 
 # ---------- ADD EXPENSE ----------
 with tab2:
     st.markdown('<div class="sub-title">➕ Add New Expense</div>', unsafe_allow_html=True)
-    members_df = utils.fetch_members(supabase)
+    members_df = fetch_members()
     if members_df.empty:
         st.info('ℹ️ Add some members first.')
     else:
@@ -99,11 +163,10 @@ with tab2:
             
             submit = st.form_submit_button('💾 Create Expense')
             if submit:
-                name2id = {r['name']: r['id'] for r in (supabase.table('members').select('*').execute().data or [])}
+                name2id = {r['name']: r['id'] for r in members_df.to_dict('records')}
                 payer_id = name2id[payer]
                 participant_ids = [name2id[p] for p in participants] or [payer_id]
-                expense_id = utils.create_expense_with_transactions(
-                    supabase,
+                create_expense_with_transactions(
                     payer_id=payer_id,
                     amount=Decimal(str(amount)),
                     title=title or '',
@@ -115,7 +178,7 @@ with tab2:
 # ---------- HISTORY ----------
 with tab3:
     st.markdown('<div class="sub-title">📜 Expense History</div>', unsafe_allow_html=True)
-    hist_df = utils.fetch_history(supabase)
+    hist_df = fetch_history()
     if hist_df.empty:
         st.info('ℹ️ No expenses yet.')
     else:
@@ -128,31 +191,26 @@ with tab3:
             mime='text/csv'
         )
 
-# ---------- BALANCES (MODIFIED) ----------
+# ---------- BALANCES ----------
 with tab4:
     st.markdown('<div class="sub-title">📊 Balances & Settlements</div>', unsafe_allow_html=True)
-    bal_df = utils.compute_balances(supabase)
+    bal_df = compute_balances()
     
     if bal_df.empty:
         st.info('ℹ️ No balances yet. Add members and expenses first.')
     else:
-        # 1️⃣ Show balance table
         st.markdown("### Current Balances")
         bal_table = bal_df.copy()
         bal_table['Balance (₹)'] = bal_table['balance'].apply(lambda x: f"₹{x:.2f}")
         st.dataframe(bal_table[['name', 'Balance (₹)']], use_container_width=True)
 
-        # 2️⃣ Settlement suggestion table (now default)
         st.markdown("### 💱 Suggested Settlements")
-        
-        # Filter for members who owe (negative balance) and are owed (positive balance)
         pos = bal_df[bal_df.balance > 0.01][['name','balance']].to_dict('records')
         neg = bal_df[bal_df.balance < -0.01][['name','balance']].to_dict('records')
 
         if not pos or not neg:
             st.info("✅ All balances are settled!")
         else:
-            # Sort for an efficient greedy matching algorithm
             pos = sorted(pos, key=lambda x: x['balance'], reverse=True)
             neg = sorted(neg, key=lambda x: x['balance'])
             
@@ -172,9 +230,7 @@ with tab4:
                 p['balance'] -= amt
                 n['balance'] += amt
                 
-                # Move to the next person if their balance is settled (using a small tolerance)
                 if abs(p['balance']) < 1e-9: i += 1
                 if abs(n['balance']) < 1e-9: j += 1
 
-            transfers_df = pd.DataFrame(transfers)
-            st.dataframe(transfers_df, use_container_width=True)
+            st.dataframe(pd.DataFrame(transfers), use_container_width=True)
