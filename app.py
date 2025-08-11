@@ -67,7 +67,7 @@ if is_login_mode and st.session_state.logged_in:
                 supabase.table("members").delete().neq('id', -1).execute()
                 st.success("✅ Database flushed successfully.")
                 st.session_state.show_flush_confirm = False
-                st.experimental_rerun()
+                st.rerun()
             except Exception as e:
                 st.error(f"❌ Error flushing DB: {e}")
 
