@@ -74,7 +74,7 @@ def guest_update_balances(payer_id, amount, participants):
     share = float(amount) / len(participants)
     for pid in participants:
         balances[pid] -= share
-    balances[payer_id] += amount - share
+    balances[payer_id] += float(amount) - share
 
     st.session_state.guest_balances = [{"id": mid, "name": member_ids[mid], "balance": bal} for mid, bal in balances.items()]
 
