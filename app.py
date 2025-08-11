@@ -1,8 +1,8 @@
 import streamlit as st
 from supabase import create_client
 from decimal import Decimal
-import utilss as utils
 import pandas as pd
+import utilss as utils
 
 # --- Setup page ---
 st.set_page_config(page_title='🏢 Splitwise — Office Edition', page_icon='💸', layout='wide')
@@ -30,7 +30,7 @@ def login_form():
         # Replace with your real auth check
         if user_id == st.secrets['app_username'] and password == st.secrets['app_password']:
             st.session_state.logged_in = True
-            st.rerun()
+            st.experimental_rerun()
         else:
             st.sidebar.error("❌ Invalid credentials")
 
@@ -71,7 +71,7 @@ if is_login_mode and st.session_state.logged_in:
                 supabase.table("members").delete().neq('id', 0).execute()
                 st.success("✅ Database flushed successfully.")
                 st.session_state.show_flush_confirm = False
-                st.rerun()
+                st.experimental_rerun()
             except Exception as e:
                 st.error(f"❌ Error flushing DB: {e}")
         if col2.button("Cancel"):
@@ -112,12 +112,9 @@ with tab2:
             description = st.text_area('Description (optional)')
             submit = st.form_submit_button('💾 Create Expense')
             if submit:
-                # Map names to IDs
                 if is_login_mode:
-                    # query fresh from supabase for consistency
                     name2id = {r['name']: r['id'] for r in (supabase.table('members').select('*').execute().data or [])}
                 else:
-                    # guest mode from session_state
                     name2id = {r['name']: r['id'] for r in st.session_state.guest_members}
                 payer_id = name2id[payer]
                 participant_ids = [name2id[p] for p in participants] or [payer_id]
@@ -131,21 +128,48 @@ with tab2:
                 )
                 st.success('✅ Expense created')
 
-# --- HISTORY ---
+# --- HISTORY (grouped tables + delete per expense) ---
 with tab3:
     st.markdown('<h3>📜 Expense History</h3>', unsafe_allow_html=True)
     hist_df = utils.fetch_history(supabase)
+
     if hist_df.empty:
         st.info('ℹ️ No expenses yet.')
     else:
-        st.dataframe(hist_df, use_container_width=True)
-        csv = hist_df.to_csv(index=False).encode('utf-8')
-        st.download_button('📥 Download CSV', data=csv, file_name='history.csv', mime='text/csv')
+        unique_titles = hist_df['title'].unique()
+        for title in unique_titles:
+            st.markdown(f"### {title}")
+            sub_df = hist_df[hist_df['title'] == title].copy()
+            display_df = sub_df.drop(columns=['expense_id'])  
+            expense_id = sub_df['expense_id'].iloc[0]
+            delete_button_key = f"del_expense_{expense_id}"
 
-# --- BALANCES ---
+            st.dataframe(display_df, use_container_width=True)
+
+            if st.button(f"🗑️ Delete all entries for '{title}'", key=delete_button_key):
+                if is_login_mode:
+                    try:
+                        supabase.table("transactions").delete().eq('expense_id', expense_id).execute()
+                        supabase.table("expenses").delete().eq('id', expense_id).execute()
+                        st.success(f"Deleted expense '{title}' and related transactions.")
+                        st.experimental_rerun()
+                    except Exception as e:
+                        st.error(f"Failed to delete: {e}")
+                else:
+                    st.session_state.guest_transactions = [
+                        t for t in st.session_state.guest_transactions if t['expense_id'] != expense_id
+                    ]
+                    st.session_state.guest_expenses = [
+                        e for e in st.session_state.guest_expenses if e['id'] != expense_id
+                    ]
+                    st.success(f"Deleted expense '{title}' and related transactions (guest mode).")
+                    st.experimental_rerun()
+
+# --- BALANCES with PAID toggle buttons ---
 with tab4:
     st.markdown('<h3>📊 Balances & Settlements</h3>', unsafe_allow_html=True)
     bal_df = utils.compute_balances(supabase)
+
     if bal_df.empty:
         st.info('ℹ️ No balances yet. Add members and expenses first.')
     else:
@@ -157,11 +181,13 @@ with tab4:
         st.markdown("### 💱 Suggested Settlements")
         pos = bal_df[bal_df.balance > 0.01][['name','balance']].to_dict('records')
         neg = bal_df[bal_df.balance < -0.01][['name','balance']].to_dict('records')
+
         if not pos or not neg:
             st.info("✅ All balances are settled!")
         else:
             pos = sorted(pos, key=lambda x: x['balance'], reverse=True)
             neg = sorted(neg, key=lambda x: x['balance'])
+
             i, j = 0, 0
             transfers = []
             while i < len(pos) and j < len(neg):
@@ -173,5 +199,25 @@ with tab4:
                 n['balance'] += amt
                 if abs(p['balance']) < 1e-9: i += 1
                 if abs(n['balance']) < 1e-9: j += 1
-            transfers_df = pd.DataFrame(transfers)
-            st.dataframe(transfers_df, use_container_width=True)
+
+            if 'paid_settlements' not in st.session_state:
+                st.session_state.paid_settlements = set()
+
+            for idx, row in enumerate(transfers):
+                key = f"settlement_paid_{idx}"
+                paid = key in st.session_state.paid_settlements
+
+                col1, col2 = st.columns([1, 6])
+                with col1:
+                    if st.button("PAID" if not paid else "UNPAID", key=key):
+                        if paid:
+                            st.session_state.paid_settlements.remove(key)
+                        else:
+                            st.session_state.paid_settlements.add(key)
+                        st.experimental_rerun()
+                with col2:
+                    style = "text-decoration: line-through; color: gray;" if paid else ""
+                    st.markdown(
+                        f"<div style='{style}'>From: <b>{row['From']}</b> ➔ To: <b>{row['To']}</b> — Amount: <b>₹{row['Amount (₹)']}</b></div>",
+                        unsafe_allow_html=True
+                    )
