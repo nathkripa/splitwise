@@ -30,6 +30,13 @@ st.markdown("""
         .dataframe {
             border-radius: 8px;
         }
+        .metric-card {
+            background-color: #f8f9fa;
+            border-radius: 12px;
+            padding: 15px;
+            text-align: center;
+            box-shadow: 0 2px 6px rgba(0,0,0,0.05);
+        }
     </style>
 """, unsafe_allow_html=True)
 
@@ -121,41 +128,53 @@ with tab3:
             mime='text/csv'
         )
 
-# ---------- BALANCES ----------
+# ---------- BALANCES (MODIFIED) ----------
 with tab4:
     st.markdown('<div class="sub-title">📊 Balances & Settlements</div>', unsafe_allow_html=True)
     bal_df = utils.compute_balances(supabase)
+    
     if bal_df.empty:
-        st.info('ℹ️ No balances yet.')
+        st.info('ℹ️ No balances yet. Add members and expenses first.')
     else:
-        # Show balance table
+        # 1️⃣ Show balance table
         st.markdown("### Current Balances")
         bal_table = bal_df.copy()
         bal_table['Balance (₹)'] = bal_table['balance'].apply(lambda x: f"₹{x:.2f}")
         st.dataframe(bal_table[['name', 'Balance (₹)']], use_container_width=True)
 
-        # Settlement suggestion table
-        if st.button('💡 Suggest Minimal Transfers'):
-            pos = bal_df[bal_df.balance > 0][['name','balance']].to_dict('records')
-            neg = bal_df[bal_df.balance < 0][['name','balance']].to_dict('records')
+        # 2️⃣ Settlement suggestion table (now default)
+        st.markdown("### 💱 Suggested Settlements")
+        
+        # Filter for members who owe (negative balance) and are owed (positive balance)
+        pos = bal_df[bal_df.balance > 0.01][['name','balance']].to_dict('records')
+        neg = bal_df[bal_df.balance < -0.01][['name','balance']].to_dict('records')
+
+        if not pos or not neg:
+            st.info("✅ All balances are settled!")
+        else:
+            # Sort for an efficient greedy matching algorithm
             pos = sorted(pos, key=lambda x: x['balance'], reverse=True)
             neg = sorted(neg, key=lambda x: x['balance'])
+            
             i, j = 0, 0
             transfers = []
             while i < len(pos) and j < len(neg):
-                p = pos[i]; n = neg[j]
+                p = pos[i]
+                n = neg[j]
                 amt = min(p['balance'], -n['balance'])
+                
                 transfers.append({
                     'From': n['name'],
                     'To': p['name'],
                     'Amount (₹)': round(amt, 2)
                 })
+                
                 p['balance'] -= amt
                 n['balance'] += amt
+                
+                # Move to the next person if their balance is settled (using a small tolerance)
                 if abs(p['balance']) < 1e-9: i += 1
                 if abs(n['balance']) < 1e-9: j += 1
 
-            st.markdown("### 💱 Suggested Settlements")
             transfers_df = pd.DataFrame(transfers)
             st.dataframe(transfers_df, use_container_width=True)
-
