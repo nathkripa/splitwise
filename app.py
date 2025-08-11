@@ -1,7 +1,7 @@
 import streamlit as st
 from supabase import create_client
 from decimal import Decimal
-import utilss
+import utilss as utils
 
 # --- Setup page ---
 st.set_page_config(page_title='🏢 Splitwise — Office Edition', page_icon='💸', layout='wide')
