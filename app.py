@@ -50,6 +50,30 @@ if is_login_mode and st.session_state.logged_in:
 else:
     supabase = None
 
+if is_login_mode and st.session_state.logged_in:
+    with st.sidebar:
+        st.markdown("---")
+        st.markdown("### ⚠️ Danger Zone")
+        if st.button("🗑️ Flush Entire Database"):
+            st.session_state.show_flush_confirm = True
+
+    if st.session_state.get("show_flush_confirm", False):
+        st.warning("This will permanently DELETE ALL data from the database! Are you sure?")
+        col1, col2 = st.columns(2)
+        if col1.button("Yes, Delete Everything"):
+            try:
+                supabase.table("transactions").delete().execute()
+                supabase.table("expenses").delete().execute()
+                supabase.table("members").delete().execute()
+                st.success("✅ Database flushed successfully.")
+                st.session_state.show_flush_confirm = False
+                st.experimental_rerun()
+            except Exception as e:
+                st.error(f"❌ Error flushing DB: {e}")
+
+        if col2.button("Cancel"):
+            st.session_state.show_flush_confirm = False
+
 # ---------- GUEST MODE HELPERS ----------
 def guest_fetch_members():
     return pd.DataFrame(st.session_state.get("guest_members", []), columns=["id", "name"])
