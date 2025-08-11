@@ -30,13 +30,6 @@ st.markdown("""
         .dataframe {
             border-radius: 8px;
         }
-        .metric-card {
-            background-color: #f8f9fa;
-            border-radius: 12px;
-            padding: 15px;
-            text-align: center;
-            box-shadow: 0 2px 6px rgba(0,0,0,0.05);
-        }
     </style>
 """, unsafe_allow_html=True)
 
@@ -135,23 +128,13 @@ with tab4:
     if bal_df.empty:
         st.info('ℹ️ No balances yet.')
     else:
-        # 1️⃣ Show balance table
+        # Show balance table
         st.markdown("### Current Balances")
         bal_table = bal_df.copy()
         bal_table['Balance (₹)'] = bal_table['balance'].apply(lambda x: f"₹{x:.2f}")
         st.dataframe(bal_table[['name', 'Balance (₹)']], use_container_width=True)
 
-        # 2️⃣ Show as metric cards
-        cols = st.columns(len(bal_df))
-        for idx, row in bal_df.iterrows():
-            color = "green" if row.balance > 0 else "red" if row.balance < 0 else "gray"
-            with cols[idx]:
-                st.markdown(
-                    f"<div class='metric-card'><b>{row.name}</b><br><span style='color:{color}'>₹{row.balance:.2f}</span></div>",
-                    unsafe_allow_html=True
-                )
-
-        # 3️⃣ Settlement suggestion table
+        # Settlement suggestion table
         if st.button('💡 Suggest Minimal Transfers'):
             pos = bal_df[bal_df.balance > 0][['name','balance']].to_dict('records')
             neg = bal_df[bal_df.balance < 0][['name','balance']].to_dict('records')
@@ -175,3 +158,4 @@ with tab4:
             st.markdown("### 💱 Suggested Settlements")
             transfers_df = pd.DataFrame(transfers)
             st.dataframe(transfers_df, use_container_width=True)
+
