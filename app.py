@@ -175,4 +175,3 @@ with tab4:
             st.markdown("### 💱 Suggested Settlements")
             transfers_df = pd.DataFrame(transfers)
             st.dataframe(transfers_df, use_container_width=True)
-)
