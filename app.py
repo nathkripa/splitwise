@@ -135,7 +135,13 @@ with tab4:
     if bal_df.empty:
         st.info('ℹ️ No balances yet.')
     else:
-        # Show as metrics
+        # 1️⃣ Show balance table
+        st.markdown("### Current Balances")
+        bal_table = bal_df.copy()
+        bal_table['Balance (₹)'] = bal_table['balance'].apply(lambda x: f"₹{x:.2f}")
+        st.dataframe(bal_table[['name', 'Balance (₹)']], use_container_width=True)
+
+        # 2️⃣ Show as metric cards
         cols = st.columns(len(bal_df))
         for idx, row in bal_df.iterrows():
             color = "green" if row.balance > 0 else "red" if row.balance < 0 else "gray"
@@ -145,6 +151,7 @@ with tab4:
                     unsafe_allow_html=True
                 )
 
+        # 3️⃣ Settlement suggestion table
         if st.button('💡 Suggest Minimal Transfers'):
             pos = bal_df[bal_df.balance > 0][['name','balance']].to_dict('records')
             neg = bal_df[bal_df.balance < 0][['name','balance']].to_dict('records')
@@ -155,10 +162,17 @@ with tab4:
             while i < len(pos) and j < len(neg):
                 p = pos[i]; n = neg[j]
                 amt = min(p['balance'], -n['balance'])
-                transfers.append({'from': n['name'], 'to': p['name'], 'amount': round(amt,2)})
-                p['balance'] -= amt; n['balance'] += amt
+                transfers.append({
+                    'From': n['name'],
+                    'To': p['name'],
+                    'Amount (₹)': round(amt, 2)
+                })
+                p['balance'] -= amt
+                n['balance'] += amt
                 if abs(p['balance']) < 1e-9: i += 1
                 if abs(n['balance']) < 1e-9: j += 1
-            st.subheader("💱 Suggested Transfers")
-            for t in transfers:
-                st.write(f"➡️ **{t['from']}** → **{t['to']}**: ₹{t['amount']}")
+
+            st.markdown("### 💱 Suggested Settlements")
+            transfers_df = pd.DataFrame(transfers)
+            st.dataframe(transfers_df, use_container_width=True)
+)
