@@ -2,7 +2,7 @@ import streamlit as st
 from supabase import create_client
 from decimal import Decimal
 import pandas as pd
-import utilss as utils
+import utils
 
 # --- Setup page ---
 st.set_page_config(page_title='🏢 Splitwise — Office Edition', page_icon='💸', layout='wide')
@@ -65,7 +65,7 @@ if is_login_mode and st.session_state.logged_in:
         st.markdown("### ⚠️ Danger Zone")
         admin_pass = st.text_input("Admin password to flush DB", type="password", key="flush_pass")
         if st.button("🗑️ Flush Entire Database"):
-            if admin_pass == "admin123":  # Replace with your real admin password check
+            if admin_pass == st.secrets['admin_pass']:  # Replace with your real admin password check
                 st.session_state.show_flush_confirm = True
             else:
                 st.error("❌ Incorrect admin password")
