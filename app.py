@@ -57,9 +57,20 @@ st.caption("Easily manage and split expenses for your team. Powered by Streamlit
 if is_login_mode and st.session_state.logged_in:
     with st.sidebar:
         st.markdown("---")
+        if st.button("🔓 Logout"):
+            st.session_state.logged_in = False
+            st.rerun()
+            
+        st.markdown("---")
         st.markdown("### ⚠️ Danger Zone")
+        admin_pass = st.text_input("Admin password to flush DB", type="password", key="flush_pass")
         if st.button("🗑️ Flush Entire Database"):
-            st.session_state.show_flush_confirm = True
+            if admin_pass == "admin123":  # Replace with your real admin password check
+                st.session_state.show_flush_confirm = True
+            else:
+                st.error("❌ Incorrect admin password")
+
+        st.markdown("</div>", unsafe_allow_html=True)
 
     if st.session_state.get("show_flush_confirm", False):
         st.warning("This will permanently DELETE ALL data from the database! Are you sure?")
